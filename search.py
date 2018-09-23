@@ -117,7 +117,7 @@ class Node:
     
     def solution(self):
         """Return the sequence of actions to go from the root to this node."""
-        return [node.action for node in self.path()[1:]]
+        return [{'Action': node.action, 'State':node.state, 'Path_Cost': node.path_cost} for node in self.path()[1:]]
 
     def path(self):
         """Return a list of nodes forming the path from the root to this node."""
@@ -266,12 +266,14 @@ def best_first_graph_search(problem, f):
     frontier = PriorityQueue('min', f)
     frontier.append(node)
     explored = set()
+    num_node_gen = 0
     while frontier:
         node = frontier.pop()
         if problem.goal_test(node.state):
-            return node
+            return node, num_node_gen
         explored.add(node.state)
         for child in node.expand(problem):
+            num_node_gen = num_node_gen + 1
             if child.state not in explored and child not in frontier:
                 frontier.append(child)
             elif child in frontier:
@@ -485,6 +487,85 @@ class EightPuzzle(Problem):
         return sum(s != g for (s, g) in zip(node.state, self.goal))
 
 # ______________________________________________________________________________
+
+
+class VacuumClean(Problem):
+    """ The problem of sliding tiles numbered with 0 or 1 on a 3x3 board plus the current location of agent,
+    where the last element is the location of the agent. A state is represented as a 3x3 list,
+    where element at index i,j represents the status of clean/dirty (0 if it's clean)
+    example:
+        Initial State                         Goal State
+        | 1 | 1 | 1 |                        | 0 | 0 | 0 |
+        | 0 | 0 | 0 |                        | 0 | 0 | 0 |
+        | 0 | 0 | 0 |                        | 0 | 0 | 0 |
+        with 4 agent location(2,2)            regardless of the location of agent
+    """
+
+
+    def __init__(self, initial, goal=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)):
+        """ Define goal state and initialize a problem """
+
+        self.goal = goal
+        Problem.__init__(self, initial, goal)
+
+    def actions(self, state):
+        """ Return the actions that can be executed in the given state.
+        The result would be a list, since there are only five possible actions
+        in any given state of the environment """
+
+        possible_actions = ['SUCK', 'UP', 'LEFT', 'DOWN', 'RIGHT']
+        loc_agent = state[-1]
+
+        if loc_agent % 3 == 0:
+            possible_actions.remove('LEFT')
+        if loc_agent < 3:
+            possible_actions.remove('UP')
+        if loc_agent % 3 == 2:
+            possible_actions.remove('RIGHT')
+        if loc_agent > 5:
+            possible_actions.remove('DOWN')
+
+        return possible_actions
+
+    def result(self, state, action):
+        """ Given state and action, return a new state that is the result of the action.
+        Action is assumed to be a valid action in the state """
+
+        # current agent's location
+        loc_agent = state[-1]
+
+        new_state = list(state)
+
+        if 'SUCK'.upper() == action.upper():
+            new_state[loc_agent] = 0
+        else:
+            delta = {'UP':-3, 'DOWN':3, 'LEFT':-1, 'RIGHT':1}
+            new_state[-1] = loc_agent + delta[action]
+
+        return tuple(new_state)
+
+    def goal_test(self, state):
+        """ Given a state, return True if state is a goal state(Ignore agent location) or False, otherwise """
+
+        return state[:-1] == self.goal[:-1]
+
+    def value(self, state):
+        pass
+
+    def path_cost(self, c, state1, action, state2):
+        """Return the cost of a solution path that arrives at state2 from
+        state1 via action, assuming cost c to get up to state1. If the problem
+        is such that the path doesn't matter, this function will only look at
+        state2.  If the path does matter, it will consider c and maybe state1
+        and action. The default method costs 1 for every step in the path."""
+        return c + 1 + 2 * state2[:-1].count(1)
+
+    def h(self, node):
+        """ Return the heuristic value for a given state.
+        Default heuristic function used is
+        h(n) = number of dirty squares """
+
+        return sum(s != g for (s, g) in zip(node.state[:-1], self.goal[:-1]))
 
 
 class PlanRoute(Problem):
